@@ -29,15 +29,15 @@ graph TD
         S3["S3 Bucket (meu-bucket-arquivos)"]
     end
 
-    UI -->|HTTP POST| APIGW
-    APIGW -->|Proxy Trigger| PRODUCER
-    PRODUCER -->|Dispatch Message| SQS
-    SQS -->|Event Source Mapping| CONSUMER
-    CONSUMER -->|Persist JSON| S3
-    UI -->|HTTP GET (Stats)| APIGW
-    APIGW -->|Proxy| PRODUCER
-    PRODUCER -->|Query Metrics| SQS
-    PRODUCER -->|List Objects| S3
+    UI -->|"HTTP POST"| APIGW
+    APIGW -->|"Proxy Trigger"| PRODUCER
+    PRODUCER -->|"Dispatch Message"| SQS
+    SQS -->|"Event Source Mapping"| CONSUMER
+    CONSUMER -->|"Persist JSON"| S3
+    UI -->|"HTTP GET (Stats)"| APIGW
+    APIGW -->|"Proxy"| PRODUCER
+    PRODUCER -->|"Query Metrics"| SQS
+    PRODUCER -->|"List Objects"| S3
 ```
 
 ---
