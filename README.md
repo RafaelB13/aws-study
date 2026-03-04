@@ -1,82 +1,107 @@
-# S3 Gateway Uploader - Serverless Completo no LocalStack
+# ☁️ S3 LocalStack Serverless Uploader
 
-Este projeto deixou de ser apenas um script brincando no terminal e virou uma **Aplicação Completa e Visual**. Agora temos um Frontend bonitão feito em HTML comunicando diretamente com nossos serviços simulados da AWS (API Gateway -> Lambda -> S3)! Tudo rodando offline!
+Este repositório demonstra a construção de uma aplicação _Full-Stack Serverless_ operando inteiramente em ambiente local. A arquitetura simula com precisão serviços da Amazon Web Services (AWS) utilizando o **LocalStack**, orquestrando uma comunicação ponta a ponta desde uma interface web (Frontend) até o armazenamento em nuvem (Backend).
 
 ---
 
-## 🏗️ Como Funciona o Fluxo Atual (De forma bem simples!)
+## 🏗️ Arquitetura e Fluxo de Dados
 
-Imagine que o sistema que construímos é um restaurante Fast-Food.
+A infraestrutura é desenhada utilizando os seguintes componentes principais da nuvem:
 
-1. **📱 Você (O Frontend / Cliente)**
-   É o aplicativo rodando no seu navegador (aquele formulário que abriu no Vite). Você escolhe o lanche (escreve o nome do arquivo) e o recheio (digita o conteúdo do texto) e clica no botão "Fazer Upload".
+1. **🧑‍� Aplicação Cliente (Vite/TailwindCSS):**
+   Interface de usuário (Frontend) desenvolvida em TypeScript. Captura os dados inseridos pelo usuário (nome e conteúdo do arquivo) e aciona a API de backend através de requisições assíncronas (HTTP POST).
 
-2. **🤵‍♂️ O Garçom (API Gateway)**
-   Sua tela manda tudo através daquela "URL gigante" para o API Gateway. O API é o garçom! Ele recebe a sua comanda, anota as informações de segurança (Header, CORS) e leva o seu pedido lá pra dentro da cozinha de forma segura. O seu navegador nunca entra na cozinha.
+2. **🌐 AWS API Gateway:**
+   Atua como o ponto de entrada (roteador) seguro da infraestrutura. O API Gateway gerencia o tráfego de rede, lida com as permissões de segurança de navegadores (CORS/Preflight Headers via método `OPTIONS`) e encaminha a requisição de upload validada para o processamento.
 
-3. **👨‍🍳 O Cozinheiro Chefe (AWS Lambda)**
-   O garçom entrega o pedido na mão do Cozinheiro (a nossa Função TypeScript `handler.ts`). A função valida se veio "nome" e "conteúdo". Tudo certo? O cozinheiro embrulha tudo num pacote perfeito e entrega pro estoque.
+3. **⚙️ AWS Lambda (Node.js/TypeScript):**
+   A camada computacional. Nossa função _Serverless_ (`src/handler.ts`) recebe o pacote do Gateway, processa o arquivo JSON em memória, instancia o SDK oficial da AWS e submete o objeto formatado ao serviço de armazenamento.
 
-4. **📦 O Salão de Estoque (Amazon S3)**
-   O cozinheiro envia o pacote para ser guardado na nossa caixa "meu-bucket-arquivos" (Que instanciamos via bash). O estoque guarda o arquivo e devolve um rádio pro cozinheiro: _"Tudo salvo no servidor!"_.
+4. **🪣 Amazon S3 (Simple Storage Service):**
+   O serviço de persistência de dados. Recebe o conteúdo processado pela AWS Lambda e o grava definitivamente de forma segura dentro de um _Bucket_ (um contêiner virtual de armazenamento).
 
-5. **🧾 A Entrega na Mesa (Retorno JSON)**
-   A Lambda monta uma Nota Fiscal de sucesso (Status 201 Created), entrega pro API Gateway (O Garçom), que anda até a sua mesa e plota aquele código visual JSON verdinho na sua tela confirmando. Fim do fluxo! Tudo ocorreu em milissegundos.
+### Diagrama de Sequência (Ponta a Ponta)
 
 ```mermaid
 sequenceDiagram
-    participant App as 📱 Tela Web (Frontend)
-    participant APIGW as 🤵‍♂️ API Gateway (URL)
-    participant Lambda as 👨‍🍳 AWS Lambda (TypeScript)
-    participant S3 as 📦 AWS S3 (Bucket de Estoque)
+    participant App as �️ Aplicação Cliente
+    participant APIGW as 🌐 API Gateway
+    participant Lambda as ⚙️ AWS Lambda
+    participant S3 as 🪣 AWS S3
 
-    App->>APIGW: 1. Aperta Botão "Fazer Upload"
-    APIGW-->>App: (Trocação Oculta) Sim, o navegador permite comunicação (CORS Options)!
-    APIGW->>Lambda: 2. Garçom, entregue essa Comanda p/ Cozinha!
-    Lambda->>S3: 3. Ei Estoque S3, guarde um File(Nome, Conteúdo).
-    S3-->>Lambda: 4. Item guardado! Confirma.
-    Lambda-->>APIGW: 5. Retorna Mensagem 201 de Sucesso
-    APIGW-->>App: 6. O Garçom serve o Retorno JSON brilhante na sua Tela.
+    App->>APIGW: 1. Inicia requisição HTTP POST
+    Note right of App: Preflight CORS validado em milissegundos
+    APIGW->>Lambda: 2. Encaminha o evento (Event/Context)
+    activate Lambda
+    Lambda->>S3: 3. Executa PutObjectCommand (AWS SDK)
+    activate S3
+    S3-->>Lambda: 4. Retorna status de gravação
+    deactivate S3
+    Lambda-->>APIGW: 5. Retorna resposta padronizada (Ex: 201 Created)
+    deactivate Lambda
+    APIGW-->>App: 6. Resolve a requisição e exibe o JSON de sucesso
 ```
 
 ---
 
-## 🕹️ Como Iniciar Todo o Projeto (Passo a Passo)
+## 🛠️ Tecnologias e Ferramentas
 
-### 1. Inicie o Simulador da AWS
+- **Infraestrutura Cloud Simulado:** Docker e [LocalStack](https://localstack.cloud/)
+- **Backend:** Node.js, TypeScript, AWS SDK v3, Jest (Testes Unitários Unitários com Mocking)
+- **Frontend:** Vite, TypeScript, TailwindCSS v4
+- **Automação:** Shell Scripts Integrados (`package.json`)
 
-Se o seu LocalStack não estiver rodando no Docker, suba ele:
+---
+
+## � Guia Rápido de Instalação e Execução
+
+Todo o fluxo de provisionamento (_IaC - Infrastructure as Code_) de certa forma foi abstraído através de _scripts_ construídos para facilitar os estudos locais.
+
+### 1. Iniciar o Simulador de Nuvem
+
+Certifique-se de que o Docker está operando na sua máquina e inicie os contêineres:
 
 ```bash
 docker compose up -d
 ```
 
-### 2. Prepare a Infraestrutura com Nossos Atalhos Automáticos
+_(O LocalStack alocará seus serviços simulados na porta 4566 do painel localhost)._
 
-Pelo terminal, na raiz do projeto, digite nessa ordem:
+### 2. Provisionamento (Deploy) da Infraestrutura
+
+Na raiz do projeto em seu terminal, execute rigorosamente a ordem abaixo para provisionar os serviços na AWS simulada:
 
 ```bash
-npm run s3:local      # Cria a sala do Estoque (Cria o Bucket)
-npm run deploy:local  # Ensaia e Contrata o Cozinheiro (Compila o TS e joga na AWS)
-npm run api:local     # Contrata o Garçom para atender as mesas (Cria a URL Publica /hello)
+# Etapa 1: Cria o "Cofre" permanente no Amazon S3
+npm run s3:local
+
+# Etapa 2: Compila a função Lambda e a entrega compactada (.zip) para a AWS
+npm run deploy:local
+
+# Etapa 3: Cria as rotas e regras de HTTP (CORS) no API Gateway e devolve uma URL
+npm run api:local
 ```
 
-_(⚠️ Guarde aquela URL do "Postman" que esse último comando jogar na tela)_
+> ⚠️ **Atenção:** O último comando (`api:local`) gerará uma URL exclusiva para o Gateway (Ex: `http://localhost:4566/restapis/XXX/dev/_user_request_/hello`). **Copie e guarde esta URL.**
 
-### 3. Inicie a Interface Gráfica / Aplicação Visual
+### 3. Iniciar a Interface Gráfica
 
-Nós colocamos o Vite na raiz do projeto. Agora precisamos que ele mostre o nosso site.
+Com a infraestrutura provisionada, inicie o servidor de desenvolvimento do Frontend:
 
 ```bash
 npm run dev
 ```
 
-Clique no link `http://localhost:5174/` que aparecer no terminal e seu Front-End irá abrir!
+1. Acesse `http://localhost:5174/` utilizando seu navegador de preferência.
+2. Insira a **URL do API Gateway** copiada no Passo 2 no campo correspondente.
+3. Preencha os detalhes do arquivo e simule um envio de dados para ambiente de produção (local)!
 
-### 4. Brinque no Site!
+### 🧪 Observações sobre Ciclo de Desenvolvimento (Testes Unitários)
 
-- Cole aquela **URL gigante** (Terminando em `/hello`) da etapa 2 no primeiro espaço do site.
-- Informe o nome ("documento-secreto.txt") e um texto qualquer.
-- O Retorno do S3 aparecerá chique logo abaixo!
+Para testar isoladamente as regras de negócio escritas na função Lambda através do Jest sem depender de instâncias Docker:
 
-> Nota Importante sobre Estudo: Caso altere ou queira brincar no arquivo `src/handler.ts` (O Backend na AWS Lambda), lembre-se de sempre rodar `npm run update:local` de novo para compilar a novidade pra nuvem antes de testar a URL de novo! As mudanças no Frontend (Vite) não precisam disso, elas aparecem na mesma hora.
+```bash
+npm run test
+```
+
+Sempre que efetuar mudanças no código-fonte `src/handler.ts`, utilize **`npm run update:local`** para enviar as atualizações sem a necessidade de recriar os provisionamentos do zero.
