@@ -1,96 +1,82 @@
-# AWS Lambda TypeScript S3 Integration (LocalStack)
+# S3 Gateway Uploader - Serverless Completo no LocalStack
 
-Neste projeto de exemplo, simulamos a integração entre uma **API Gateway**, **AWS Lambda** e **Amazon S3**, rodando 100% no seu computador através do **LocalStack**.
+Este projeto deixou de ser apenas um script brincando no terminal e virou uma **Aplicação Completa e Visual**. Agora temos um Frontend bonitão feito em HTML comunicando diretamente com nossos serviços simulados da AWS (API Gateway -> Lambda -> S3)! Tudo rodando offline!
 
 ---
 
-## 🏗️ Arquitetura e Fluxo (Caso de Uso Real)
+## 🏗️ Como Funciona o Fluxo Atual (De forma bem simples!)
 
-O fluxo consiste numa funcionalidade comum: o usuário chama uma API para realizar o upload de um arquivo na nuvem.
+Imagine que o sistema que construímos é um restaurante Fast-Food.
 
-- O usuário envia uma requisição **HTTP POST** contendo um título de arquivo (`filename`) e conteúdo (`content`).
-- A requisição passa pelo **API Gateway**, que atua como porta de entrada.
-- O API Gateway aciona nossa **AWS Lambda** (a regra de negócio escrita em TypeScript).
-- A Lambda usa o **AWS SDK** (biblioteca oficial) para criar um documento lá dentro do serviço de armazenamento, o **Amazon S3**.
+1. **📱 Você (O Frontend / Cliente)**
+   É o aplicativo rodando no seu navegador (aquele formulário que abriu no Vite). Você escolhe o lanche (escreve o nome do arquivo) e o recheio (digita o conteúdo do texto) e clica no botão "Fazer Upload".
+
+2. **🤵‍♂️ O Garçom (API Gateway)**
+   Sua tela manda tudo através daquela "URL gigante" para o API Gateway. O API é o garçom! Ele recebe a sua comanda, anota as informações de segurança (Header, CORS) e leva o seu pedido lá pra dentro da cozinha de forma segura. O seu navegador nunca entra na cozinha.
+
+3. **👨‍🍳 O Cozinheiro Chefe (AWS Lambda)**
+   O garçom entrega o pedido na mão do Cozinheiro (a nossa Função TypeScript `handler.ts`). A função valida se veio "nome" e "conteúdo". Tudo certo? O cozinheiro embrulha tudo num pacote perfeito e entrega pro estoque.
+
+4. **📦 O Salão de Estoque (Amazon S3)**
+   O cozinheiro envia o pacote para ser guardado na nossa caixa "meu-bucket-arquivos" (Que instanciamos via bash). O estoque guarda o arquivo e devolve um rádio pro cozinheiro: _"Tudo salvo no servidor!"_.
+
+5. **🧾 A Entrega na Mesa (Retorno JSON)**
+   A Lambda monta uma Nota Fiscal de sucesso (Status 201 Created), entrega pro API Gateway (O Garçom), que anda até a sua mesa e plota aquele código visual JSON verdinho na sua tela confirmando. Fim do fluxo! Tudo ocorreu em milissegundos.
 
 ```mermaid
 sequenceDiagram
-    participant User as 👤 Cliente (Navegador/Postman)
-    participant APIGW as 🌐 API Gateway (URL)
-    participant Lambda as ⚙️ AWS Lambda (Node.js/TS)
-    participant S3 as 🪣 AWS S3 (Armazenamento)
+    participant App as 📱 Tela Web (Frontend)
+    participant APIGW as 🤵‍♂️ API Gateway (URL)
+    participant Lambda as 👨‍🍳 AWS Lambda (TypeScript)
+    participant S3 as 📦 AWS S3 (Bucket de Estoque)
 
-    User->>APIGW: 1. HTTP POST /hello (Body: filename, content)
-    APIGW->>Lambda: 2. Encaminha Requisição e Aciona Função
-    Lambda->>Lambda: 3. Lida com os dados da Requisição
-    Lambda->>S3: 4. SDK envia arquivo (PutObject) para "my-bucket"
-    S3-->>Lambda: 5. Confirmação do Salto S3 OK
-    Lambda-->>APIGW: 6. Envia resposta de Sucesso 200 JSON
-    APIGW-->>User: 7. Retorna JSON de Sucesso ao Cliente
+    App->>APIGW: 1. Aperta Botão "Fazer Upload"
+    APIGW-->>App: (Trocação Oculta) Sim, o navegador permite comunicação (CORS Options)!
+    APIGW->>Lambda: 2. Garçom, entregue essa Comanda p/ Cozinha!
+    Lambda->>S3: 3. Ei Estoque S3, guarde um File(Nome, Conteúdo).
+    S3-->>Lambda: 4. Item guardado! Confirma.
+    Lambda-->>APIGW: 5. Retorna Mensagem 201 de Sucesso
+    APIGW-->>App: 6. O Garçom serve o Retorno JSON brilhante na sua Tela.
 ```
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 🕹️ Como Iniciar Todo o Projeto (Passo a Passo)
 
-1. **LocalStack:** O coração local! Ele roda via Docker (usando o `docker-compose.yml`) e simula os serviços da nuvem (Lambda, S3 e API Gateway) na porta `4566`.
-2. **AWS Lambda:** Nossa computação sem servidor. Código feito em TypeScript (`src/handler.ts`).
-3. **AWS S3 (Simple Storage Service):** Serviço de nuvem para armazenar arquivos (fotos, PDFs, .txts). É o HD infinito da AWS.
-4. **API Gateway:** Cria as URLs da Web (`Endpoints REST`) que conectam com as peças soltas rodando por trás, como é o caso da nossa Lambda.
-5. **AWS SDK v3:** Instalamos a biblioteca `@aws-sdk/client-s3` da Amazon, ela nos permite conversar com os serviços via código (Ex.: instanciar o `S3Client`).
-6. **AWS CLI:** Linha de comando para dizer para o LocalStack o que que a gente quer criar. Nossos scripts no `package.json` utilizam exaustivamente isso através dos nomes `aws lambda...` ou `aws s3...`.
+### 1. Inicie o Simulador da AWS
 
----
-
-## 🚀 Passo a Passo (Como Rodar e Testar o Fluxo)
-
-Use os scripts automatizados disponíveis.
-
-### 1. Levantar o simulador (LocalStack)
-
-Se não estiver logado, suba via docker:
+Se o seu LocalStack não estiver rodando no Docker, suba ele:
 
 ```bash
 docker compose up -d
 ```
 
-### 2. Criar a Infraestrutura Externa (Fazer o Deploy Completo)
+### 2. Prepare a Infraestrutura com Nossos Atalhos Automáticos
 
-Primeiro, vamos subir o **Bucket S3** (a pasta onde os arquivos vão ficar salvos na nuvem local):
+Pelo terminal, na raiz do projeto, digite nessa ordem:
 
 ```bash
-npm run s3:local
+npm run s3:local      # Cria a sala do Estoque (Cria o Bucket)
+npm run deploy:local  # Ensaia e Contrata o Cozinheiro (Compila o TS e joga na AWS)
+npm run api:local     # Contrata o Garçom para atender as mesas (Cria a URL Publica /hello)
 ```
 
-Segundo, fazemos o "deploy" do nosso código zipado da **Lambda**:
+_(⚠️ Guarde aquela URL do "Postman" que esse último comando jogar na tela)_
+
+### 3. Inicie a Interface Gráfica / Aplicação Visual
+
+Nós colocamos o Vite na raiz do projeto. Agora precisamos que ele mostre o nosso site.
 
 ```bash
-npm run deploy:local # ou npm run update:local caso já exista
+npm run dev
 ```
 
-Terceiro, colocamos tudo na Web através do **API Gateway**:
+Clique no link `http://localhost:5174/` que aparecer no terminal e seu Front-End irá abrir!
 
-````bash
-npm run api:local
-``` *(Guarde a URL gerada por este passo!)*
+### 4. Brinque no Site!
 
-### 3. Simulando o nosso Caso de Uso do Fluxo!
-Agora enviamos através de um teste "Curl" ou Postman nosso arquivo `dados.txt` para o sistema.
-Execute trocando `<SUA_URL_API_GATEWAY>` pela URL gerada no passo anterior.
+- Cole aquela **URL gigante** (Terminando em `/hello`) da etapa 2 no primeiro espaço do site.
+- Informe o nome ("documento-secreto.txt") e um texto qualquer.
+- O Retorno do S3 aparecerá chique logo abaixo!
 
-```bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"filename": "teste-s3.txt", "content": "Conteudo super incrivel vindo da request!"}' \
-  <SUA_URL_API_GATEWAY>
-````
-
-Se tudo deu certo, sua Lambda retornará a confirmação indicando que gravou no S3!
-
-### 4. Como eu confirmo se o S3 realmente salvou?
-
-Você pode listar os arquivos de dentro do seu cofre (Bucket s3) consultando pelo código de linha de comando:
-
-```bash
-aws --endpoint-url=http://localhost:4566 --region us-east-1 s3 ls s3://meu-bucket-arquivos/
-```
+> Nota Importante sobre Estudo: Caso altere ou queira brincar no arquivo `src/handler.ts` (O Backend na AWS Lambda), lembre-se de sempre rodar `npm run update:local` de novo para compilar a novidade pra nuvem antes de testar a URL de novo! As mudanças no Frontend (Vite) não precisam disso, elas aparecem na mesma hora.
