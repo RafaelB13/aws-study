@@ -6,29 +6,35 @@ Este projeto implementa um ecossistema **Serverless Enterprise-Ready**, focado e
 
 ---
 
-## 🔄 Arquitetura de Eventos & Monitoramento
+## 🔄 Fluxo de Observabilidade e Dados
 
-O ecossistema é dividido em dois processos paralelos: o **Processamento de Pedidos** (Assíncrono) e o **Monitoramento em Tempo Real** (Polling).
+O sistema opera através de uma coreografia de eventos assíncronos e um ciclo constante de monitoramento.
 
 ```mermaid
-flowchart LR
-    subgraph Process ["🚀 Messaging Flow"]
-        A[Dashboard] -- Dispatch --> B[Producer]
-        B -- Queue --> C{SQS}
-        C -- Trigger --> D[Consumer]
-        D -- Persistence --> E[(S3)]
-        D -- Records --> F[[CloudWatch]]
-    end
+sequenceDiagram
+    participant UI as Dashboard
+    participant API as API Gateway
+    participant P as Producer
+    participant SQS as SQS
+    participant C as Consumer
+    participant S3 as S3
+    participant CW as CloudWatch
 
-    subgraph Monitor ["📊 Monitoring Flow"]
-        G[Dashboard] -- Dashboard API --> B
-        B -.->|Metrics| C
-        B -.->|Files| E
-        B -.->|Logs| F
-    end
+    Note over UI, S3: Event Dispatch Flow
+    UI->>API: Send Order
+    API->>P: Dispatch Order
+    P->>SQS: Push Message
+    SQS->>C: Trigger Order
+    C->>S3: Save JSON
+    C->>CW: Log Event
 
-    style Process fill:#1e293b,stroke:#334155,color:#fff
-    style Monitor fill:#0f172a,stroke:#334155,color:#fff
+    Note over UI, CW: Real-time Monitoring
+    UI->>API: Fetch Metrics
+    API->>P: Collect Status
+    P->>SQS: Get Depth
+    P->>S3: List Objects
+    P->>CW: Fetch Logs
+    P-->>UI: Unified State
 ```
 
 ---
