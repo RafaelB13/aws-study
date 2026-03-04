@@ -1,92 +1,147 @@
-# 🚀 AWS Serverless LocalStack Ecosystem (SQS + S3 + Lambda)
+# 🏗️ Technical Specification: AWS Serverless LocalStack Ecosystem
 
-Bem-vindo ao projeto **Lambda Uploader**! Esta aplicação demonstra um fluxo completo de processamento assíncrono utilizando serviços AWS emulados localmente via **LocalStack**. O projeto foi construído com foco em **Clean Architecture** no backend e **React Moderno** (Hooks) no frontend.
-
----
-
-## 🛠️ Detalhes Tecnológicos
-
-- **Backend**: Node.js 18 + TypeScript (com Path Aliases `@src`).
-- **Infrastructure**: LocalStack (S3, SQS, Lambda, API Gateway).
-- **Frontend**: React + Vite + Tailwind CSS 4 (com Path Aliases `@ui`).
-- **Architecture**: Clean Architecture (Domain, Application, Infrastructure, Presentation).
+Este projeto implementa um ecossistema **Serverless** completo de alta disponibilidade, focado em **Processamento Assíncrono** e **Arquitetura Desacoplada**. Utiliza **LocalStack** para emulação de infraestrutura AWS, **TypeScript** com **Clean Architecture** no backend e **React 18** com **Custom Hooks** no frontend.
 
 ---
 
-## 🏗️ Arquitetura do Sistema (Fluxo de Dados)
+## 🌩️ System Architecture
 
-O fluxo de processamento funciona da seguinte forma:
+O sistema é composto por uma malha de serviços AWS integrados para garantir escalabilidade e resiliência. A comunicação entre o Produtor e o Consumidor é mediada por uma fila de mensagens (SQS), garantindo o desacoplamento total das camadas.
 
-1.  **Frontend (React)**: O usuário aciona o botão "Simular Compra". O site faz um `POST` para o endpoint do **API Gateway**.
-2.  **Producer Lambda**: O API Gateway dispara a Lambda Produtora. Ela gera um objeto de pedido (`Order`) aleatório e o envia para uma fila **SQS**.
-3.  **SQS (Queue)**: A fila recebe o pedido e, através de um **Event Source Mapping**, "acorda" a Lambda Consumidora.
-4.  **Consumer Lambda**: A consumidora processa a mensagem da fila e persiste o JSON do pedido dentro de um bucket **S3**.
-5.  **Dashboard Online**: O frontend realiza um `GET` periódico para a Lambda Produtora (que atua como um proxy seguro) para ler métricas do SQS e S3 em tempo real, contornando limitações de CORS do LocalStack.
+```mermaid
+graph TD
+    subgraph "Frontend Layer (React 18 + Vite)"
+        UI["React Dashboard (@ui)"]
+        HOOKS["Custom Hooks (useAwsStats, useOrderAction)"]
+    end
 
----
+    subgraph "Entry Point (API Gateway)"
+        APIGW["API Gateway (REST)"]
+    end
 
-## 📦 Como as Lambdas são Geradas e Implantadas?
+    subgraph "Processing Layer (Lambdas)"
+        PRODUCER["Producer Lambda (Node.js 18)"]
+        CONSUMER["Consumer Lambda (Node.js 18)"]
+    end
 
-O processo de "nascimento" das Lambdas neste projeto segue um pipeline rigoroso de build para garantir que o TypeScript rode corretamente no ambiente Node.js da AWS:
+    subgraph "AWS Infrastructure (LocalStack)"
+        SQS["SQS Queue (minha-fila-arquivos)"]
+        S3["S3 Bucket (meu-bucket-arquivos)"]
+    end
 
-### 1. Compilação (O Passo TypeScript)
-
-Como as Lambdas rodam em arquivos `.js` comuns, primeiro usamos o comando:
-
-```bash
-npm run build # (tsc -p tsconfig.server.json)
+    UI -->|HTTP POST| APIGW
+    APIGW -->|Proxy Trigger| PRODUCER
+    PRODUCER -->|Dispatch Message| SQS
+    SQS -->|Event Source Mapping| CONSUMER
+    CONSUMER -->|Persist JSON| S3
+    UI -->|HTTP GET (Stats)| APIGW
+    APIGW -->|Proxy| PRODUCER
+    PRODUCER -->|Query Metrics| SQS
+    PRODUCER -->|List Objects| S3
 ```
 
-Ele compila apenas os arquivos do backend (`src/`) usando uma configuração específica que resolve os **Path Aliases** e gera a pasta `dist/`.
+---
 
-### 2. Empacotamento (O Passo ZIP)
+## 🔄 Data Flow: Purchase Submission & Metrics
 
-Diferente de um site, a AWS exige que o código da Lambda seja enviado em um arquivo `.zip`. Usamos o comando:
+O diagrama abaixo detalha a sequência técnica de operações desde a interação do usuário até a persistência final e o monitoramento em tempo real.
 
-```bash
-npm run build:zip
+```mermaid
+sequenceDiagram
+    participant User as React UI
+    participant APIGW as API Gateway
+    participant P as Producer Lambda
+    participant SQS as SQS Queue
+    participant C as Consumer Lambda
+    participant S3 as S3 Bucket
+
+    Note over User, S3: Fluxo de Compra (Asynchronous)
+    User->>APIGW: POST /hello (Order Request)
+    APIGW->>P: Trigger Handler
+    P->>P: Build Order Entity (Domain)
+    P->>SQS: SendMessageBatch (Queueing)
+    P-->>User: 202 Accepted {orderId}
+
+    SQS->>C: Invoke (Event Source Mapping)
+    C->>S3: PutObject (Order JSON)
+    Note right of S3: Persistência Concluída
+
+    Note over User, S3: Fluxo de Monitoramento (Polling)
+    User->>APIGW: GET /hello (Dashboard Stats)
+    APIGW->>P: Trigger Handler
+    P->>SQS: getQueueAttributes
+    P->>S3: listObjectsV2
+    P-->>User: 200 OK {sqsCount, s3Count}
 ```
-
-Ele entra na pasta `dist/` e gera um arquivo `function.zip` contendo os executáveis JavaScript.
-
-### 3. Deploy/Update no LocalStack
-
-O script principal (`start.sh`) verifica se a Lambda já existe:
-
-- **Se não existe**: Cria a função (`create-function`) definindo o nome, runtime (`nodejs18.x`), o handler (ex: `src/presentation/lambda/producer.handler`) e envia o ZIP.
-- **Se já existe**: Apenas atualiza o código fonte (`update-function-code`), permitindo iterações rápidas sem precisar deletar a infraestrutura.
 
 ---
 
-## 🚀 Como Executar Absolute Tudo (O Botão Vermelho)
+## 🔩 Backend: Clean Architecture Implementation
 
-Para rodar o ecossistema completo (Docker, Infra AWS e Frontend), basta um único comando:
+O backend foi estruturado seguindo os princípios de Robert C. Martin (**Clean Architecture**), garantindo que as regras de negócio sejam independentes de frameworks e infraestrutura.
+
+| Camada             | Responsabilidade                                     | Localização           |
+| :----------------- | :--------------------------------------------------- | :-------------------- |
+| **Domain**         | Entidades de alto nível e interfaces de domínio.     | `src/domain/`         |
+| **Application**    | Casos de Uso (Business Logic) e Portas (Interfaces). | `src/application/`    |
+| **Infrastructure** | Adaptadores AWS (S3/SQS Gateways) e Configuração.    | `src/infrastructure/` |
+| **Presentation**   | Entry points das Lambdas (Triggers).                 | `src/presentation/`   |
+
+---
+
+## 📦 Lambda Lifecycle & Build Pipeline
+
+As funções Lambda passam por um processo de transformação antes de serem injetadas no LocalStack. Como o ambiente AWS Lambda suporta apenas JavaScript (e alguns outros), realizamos o transpiling do TypeScript.
+
+```mermaid
+flowchart LR
+    TS["TypeScript Source (@src)"]
+    TSCONFIG["tsconfig.server.json (Target: CommonJS)"]
+    DIST["dist/ (JavaScript Bundle)"]
+    ZIP["function.zip (Package)"]
+    CLOUD["LocalStack Lambda @LATEST"]
+
+    TS -->|tsc Build| TSCONFIG
+    TSCONFIG -->|Generate| DIST
+    DIST -->|Compress| ZIP
+    ZIP -->|awslocal update-code| CLOUD
+```
+
+### Detalhes Técnicos do Build:
+
+1.  **Transpiling**: O `tsc` compila os arquivos do backend usando `module: commonjs` (compatível com o runtime padrão do Node.js na AWS).
+2.  **Path Resolution**: Durante o build, os aliases `@src` são resolvidos em caminhos relativos para garantir que o Node.js encontre os módulos dentro do ZIP.
+3.  **Deployment**: O `start.sh` gerencia de forma idempotente a criação ou atualização das funções no LocalStack.
+
+---
+
+## ⚛️ Frontend: Modern Reactive Patterns
+
+O frontend utiliza **React 18** com uma arquitetura baseada em **Custom Hooks**, promovendo a separação entre lógica de estado (hooks) e visual (componentes).
+
+- **`useLocalStorage`**: Preservação persistente da URL do API Gateway.
+- **`useAwsStats`**: Gerencia o polling de 2s e limpeza de intervalos (memory management).
+- **`useOrderAction`**: Encapsula a lógica de requisição POST, retry e tratamento de erro de rede/CORS.
+
+---
+
+## 🚀 Execution & DevOps
+
+O projeto possui um **Big Red Button** (Comando Único) que orquestra todo o provisionamento via script Bash:
 
 ```bash
 npm run server
 ```
 
-Este comando executa o script `start.sh`, que:
+**O que o `start.sh` executa:**
 
-1.  Inicia o contêiner do **Docker Compose**.
-2.  Aguardat até que o **LocalStack** esteja saudável.
-3.  Cria o Bucket S3 e a Fila SQS.
-4.  Compila e faz o deploy das duas Lambdas.
-5.  Configura as rotas e o CORS do API Gateway.
-6.  Salva a URL gerada no seu arquivo `.env.local`.
-7.  Inicia o servidor de desenvolvimento do **Vite (React)**.
-
----
-
-## 📁 Organização de Pastas (Clean Architecture)
-
-- `src/domain`: Entidades de negócio (onde o "Pedido" é definido).
-- `src/application`: Use Cases (a lógica de _o que_ deve acontecer).
-- `src/infrastructure`: Gateways AWS (a implementação técnica de _como_ o S3/SQS é acessado).
-- `src/presentation`: Handlers das Lambdas (os pontos de entrada).
-- `ui/components`: Partes visuais do React.
-- `ui/hooks`: Toda a inteligência reativa (ex: `useAwsStats`).
+1.  **Containerize**: Sobe o `docker compose` com o contêiner do LocalStack.
+2.  **Health Check**: Aguarda o S3 do LocalStack retornar `running` via cURL.
+3.  **Infrastructure as Code (IaC)**: Executa scripts bash para criar Bucket S3, Fila SQS e Gatilhos de Evento.
+4.  **Backend CI**: Compila o TypeScript do server e gera o artefato ZIP.
+5.  **Provisioning**: Deploys ou Atualiza as Lambdas com as permissões IAM e Triggers corretos.
+6.  **Vite Server**: Inicia o Frontend injetando dinamicamente a URL do API Gateway no `.env.local`.
 
 ---
 
-**Desenvolvido com 🚀 e Antigravity.**
+**Developed with Precision & Clean Code Principles.**
