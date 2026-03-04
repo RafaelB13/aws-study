@@ -4,6 +4,7 @@ export interface Order {
   orderDate: string;
   status?: 'PENDING' | 'PROCESSED';
   processedAt?: string;
+  size?: number;
 }
 
 export interface SystemStats {
@@ -13,6 +14,7 @@ export interface SystemStats {
     delayed: number;
   };
   s3Count: number;
+  totalS3Size: number;
   orders: Order[];
   logs: {
     message: string;

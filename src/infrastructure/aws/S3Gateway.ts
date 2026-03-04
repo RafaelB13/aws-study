@@ -31,12 +31,13 @@ export class S3Gateway implements IStorageGateway {
     }));
   }
 
-  async getStorageMetrics(): Promise<number> {
+  async getStorageMetrics(): Promise<{ count: number; totalSize: number }> {
     try {
       const res = await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName }));
-      return res.KeyCount || 0;
+      const totalSize = res.Contents?.reduce((acc, obj) => acc + (obj.Size || 0), 0) || 0;
+      return { count: res.KeyCount || 0, totalSize };
     } catch (error) {
-      return 0;
+      return { count: 0, totalSize: 0 };
     }
   }
 
@@ -49,13 +50,15 @@ export class S3Gateway implements IStorageGateway {
         try {
           const getRes = await this.s3Client.send(new GetObjectCommand({ Bucket: this.bucketName, Key: obj.Key! }));
           const bodyContent = await getRes.Body?.transformToString();
-          return JSON.parse(bodyContent || '{}') as Order;
+          const order = JSON.parse(bodyContent || '{}') as Order;
+          return { ...order, size: obj.Size };
         } catch (e) {
           return {
             orderId: obj.Key?.replace('.json', '') || 'unknown',
             product: 'Error loading data',
             orderDate: obj.LastModified?.toISOString() || '',
-            status: 'PROCESSED' as const
+            status: 'PROCESSED' as const,
+            size: obj.Size
           };
         }
       });

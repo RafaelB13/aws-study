@@ -7,6 +7,7 @@ export interface Stats {
     delayed: number;
   };
   s3Count: number;
+  totalS3Size: number;
   orders: any[];
   logs: any[];
 }
@@ -15,6 +16,7 @@ export const useAwsStats = (apiUrl: string) => {
   const [stats, setStats] = useState<Stats>({ 
     sqs: { visible: 0, inFlight: 0, delayed: 0 }, 
     s3Count: 0, 
+    totalS3Size: 0,
     orders: [],
     logs: []
   });
@@ -29,6 +31,7 @@ export const useAwsStats = (apiUrl: string) => {
         setStats({
           sqs: data.sqs || { visible: 0, inFlight: 0, delayed: 0 },
           s3Count: data.s3Count || 0,
+          totalS3Size: data.totalS3Size || 0,
           orders: data.orders || [],
           logs: data.logs || []
         });

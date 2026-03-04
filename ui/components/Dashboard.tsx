@@ -8,6 +8,15 @@ interface DashboardProps {
 
 const ITEMS_PER_PAGE = 8;
 
+// Helper: Formatar tamanhos legíveis
+const formatBytes = (bytes: number) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ apiUrl }) => {
   const stats = useAwsStats(apiUrl);
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,7 +79,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl }) => {
            </div>
         </div>
         <StatCard title="Compute Nodes" value={2} unit="LAMBDAS" icon="⚡" color="indigo" subtitle="Producer & Consumer" />
-        <StatCard title="Storage Archive" value={stats.s3Count} unit="OBJECTS" icon="🗄️" color="emerald" subtitle="S3 Persistence" />
+        <StatCard 
+          title="Storage Archive" 
+          value={stats.s3Count} 
+          unit="OBJECTS" 
+          icon="🗄️" 
+          color="emerald" 
+          subtitle={`${formatBytes(stats.totalS3Size)} Totalized`} 
+        />
       </div>
 
       {/* TABS SELECTOR */}
@@ -110,23 +126,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl }) => {
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase border-b border-slate-800">Order ID</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase border-b border-slate-800">Timestamp</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase border-b border-slate-800">Product</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase border-b border-slate-800">Size</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase border-b border-slate-800">Status</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase border-b border-slate-800 text-right">Raw</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {currentOrders.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-500 italic text-sm">No data in S3...</td></tr>
+                  <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-500 italic text-sm">No data in S3...</td></tr>
                 ) : (
                   currentOrders.map((order: any) => {
                     const id = order.orderId || order.pedidoId || 'N/A';
                     const prod = order.product || order.produto || 'N/A';
                     const date = order.orderDate || order.dataPedido || order.processedAt;
+                    const size = order.size || 0;
                     return (
                       <tr key={id} className="hover:bg-indigo-500/5 transition-colors group">
                         <td className="px-6 py-4 font-mono text-xs text-indigo-400 font-bold">{id}</td>
                         <td className="px-6 py-4 text-xs text-slate-400">{date ? new Date(date).toLocaleString() : 'N/A'}</td>
                         <td className="px-6 py-4 text-xs text-slate-300">{prod}</td>
+                        <td className="px-6 py-4 text-[10px] font-mono font-bold text-slate-500">{formatBytes(size)}</td>
                         <td className="px-6 py-4"><span className="px-2 py-1 rounded-md text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-tighter">PROCESSED</span></td>
                         <td className="px-6 py-4 text-right"><button onClick={() => setSelectedOrder(order)} className="text-[10px] font-bold text-slate-500 hover:text-white uppercase underline">Details</button></td>
                       </tr>
@@ -146,14 +165,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ apiUrl }) => {
                  <span className="text-[9px] font-bold text-slate-500 uppercase">Live Tail Active</span>
               </div>
            </div>
-           <div className="p-4 font-mono text-xs overflow-y-auto max-h-[600px] custom-scrollbar bg-slate-950 selection:bg-indigo-500/50">
+           <div className="p-4 font-mono text-xs overflow-y-auto max-h-150 custom-scrollbar bg-slate-950 selection:bg-indigo-500/50">
               {stats.logs.length === 0 ? (
                 <p className="text-slate-600 italic p-4 text-center">No logs detected yet. Dispatch some orders to trigger the consumer!</p>
               ) : (
                 stats.logs.map((log, i) => (
                   <div key={i} className="py-1 border-l-2 border-slate-800 pl-4 hover:border-indigo-500 hover:bg-white/5 transition-all group">
                     <span className="text-slate-600 mr-4 text-[10px] tabular-nums font-bold">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                    <span className={`text-slate-300 break-words ${log.message.includes('ERROR') ? 'text-red-400 font-bold' : log.message.includes('INFO') ? 'text-blue-300' : ''}`}>
+                    <span className={`text-slate-300 wrap-break-word ${log.message.includes('ERROR') ? 'text-red-400 font-bold' : log.message.includes('INFO') ? 'text-blue-300' : ''}`}>
                       {log.message}
                     </span>
                   </div>

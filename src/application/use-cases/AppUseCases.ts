@@ -36,13 +36,19 @@ export class GetSystemStatusUseCase {
   ) {}
 
   async execute(): Promise<SystemStats> {
-    const [sqs, s3Count, orders, logs] = await Promise.all([
+    const [sqs, s3Metrics, orders, logs] = await Promise.all([
       this.queueGateway.getQueueMetrics(),
       this.storageGateway.getStorageMetrics(),
       this.storageGateway.listOrders(),
       this.loggingGateway.getRecentLogs('/aws/lambda/my-consumer-lambda', 20)
     ]);
 
-    return { sqs, s3Count, orders, logs };
+    return { 
+      sqs, 
+      s3Count: s3Metrics.count, 
+      totalS3Size: s3Metrics.totalSize, 
+      orders, 
+      logs 
+    };
   }
 }

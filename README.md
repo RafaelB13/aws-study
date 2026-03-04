@@ -2,6 +2,8 @@
 
 Este projeto implementa um ecossistema **Serverless Enterprise-Ready**, focado em **Processamento Event-Driven** e **Observabilidade Profunda**. A aplicação automatiza o ciclo de vida de pedidos de e-commerce, utilizando SQS como buffer de carga e S3 para arquivamento definitivo, tudo monitorado por um Dashboard de controle em tempo real.
 
+![Dashboard Preview](./assets/frontend.png)
+
 ---
 
 ## 🔄 Fluxo de Observabilidade e Dados
