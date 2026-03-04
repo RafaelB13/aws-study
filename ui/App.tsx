@@ -6,8 +6,9 @@ import { useOrderAction } from '@ui/hooks/useOrderAction';
 import React from 'react';
 
 export const App: React.FC = () => {
-  const [apiUrl, setApiUrl] = useLocalStorage('apiUrl', '');
-  const { response, status, loading, simulateOrder } = useOrderAction(apiUrl);
+  const defaultUrl = import.meta.env.VITE_API_URL || 'http://localhost:4566/restapis/XXXXXXXX/dev/_user_request_/hello';
+  const [apiUrl, setApiUrl] = useLocalStorage('apiUrl', defaultUrl);
+  const { response, status, loading, simulateOrder, bulkSimulation } = useOrderAction(apiUrl);
 
   return (
     <div className="w-full min-h-screen bg-slate-950 flex flex-col font-sans selection:bg-indigo-500/30">
@@ -48,6 +49,7 @@ export const App: React.FC = () => {
                 apiUrl={apiUrl} 
                 onUrlChange={setApiUrl} 
                 onSubmit={simulateOrder} 
+                onBulkSubmit={bulkSimulation}
                 loading={loading} 
               />
             </div>

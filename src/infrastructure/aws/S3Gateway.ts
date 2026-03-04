@@ -1,4 +1,4 @@
-import { ListObjectsV2Command, PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import { IStorageGateway } from '@src/application/interfaces/Gateways';
 import { Order } from '@src/domain/entities';
 
@@ -7,20 +7,13 @@ export class S3Gateway implements IStorageGateway {
   private readonly bucketName = process.env.ORDER_BUCKET_NAME || 'meu-bucket-arquivos';
 
   constructor(endpoint?: string) {
-    // SMART SDK: Se estivermos no LocalStack, usamos o endpoint local e test credentials.
-    // Na AWS Real (sem endpoint passado), o SDK assume a autenticação via IAM Role da Lambda.
     const isLocal = !!process.env.LOCALSTACK_HOSTNAME || (endpoint && endpoint.includes('localhost'));
-    
-    const config: S3ClientConfig = {
-      region: 'us-east-1',
-    };
-
+    const config: S3ClientConfig = { region: 'us-east-1' };
     if (isLocal && endpoint) {
       config.endpoint = endpoint;
       config.forcePathStyle = true;
       config.credentials = { accessKeyId: 'test', secretAccessKey: 'test' };
     }
-
     this.s3Client = new S3Client(config);
   }
 
@@ -43,7 +36,6 @@ export class S3Gateway implements IStorageGateway {
       const res = await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName }));
       return res.KeyCount || 0;
     } catch (error) {
-      console.error('Error fetching S3 metrics:', error);
       return 0;
     }
   }
@@ -54,12 +46,18 @@ export class S3Gateway implements IStorageGateway {
       if (!listRes.Contents) return [];
 
       const ordersPromises = listRes.Contents.map(async (obj) => {
-        return {
-          orderId: obj.Key?.replace('.json', '') || 'unknown',
-          product: 'Stored in S3',
-          orderDate: obj.LastModified?.toISOString() || '',
-          status: 'PROCESSED' as const
-        };
+        try {
+          const getRes = await this.s3Client.send(new GetObjectCommand({ Bucket: this.bucketName, Key: obj.Key! }));
+          const bodyContent = await getRes.Body?.transformToString();
+          return JSON.parse(bodyContent || '{}') as Order;
+        } catch (e) {
+          return {
+            orderId: obj.Key?.replace('.json', '') || 'unknown',
+            product: 'Error loading data',
+            orderDate: obj.LastModified?.toISOString() || '',
+            status: 'PROCESSED' as const
+          };
+        }
       });
 
       return Promise.all(ordersPromises);

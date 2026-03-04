@@ -36,16 +36,25 @@ export class SQSGateway implements IQueueGateway {
     }));
   }
 
-  async getQueueMetrics(): Promise<number> {
+  async getQueueMetrics(): Promise<{ visible: number; inFlight: number; delayed: number; }> {
     try {
       const res = await this.sqsClient.send(new GetQueueAttributesCommand({
         QueueUrl: this.queueUrl,
-        AttributeNames: ['ApproximateNumberOfMessages']
+        AttributeNames: [
+          'ApproximateNumberOfMessages',
+          'ApproximateNumberOfMessagesNotVisible',
+          'ApproximateNumberOfMessagesDelayed'
+        ]
       }));
-      return parseInt(res.Attributes?.['ApproximateNumberOfMessages'] || '0');
+
+      return {
+        visible: parseInt(res.Attributes?.['ApproximateNumberOfMessages'] || '0'),
+        inFlight: parseInt(res.Attributes?.['ApproximateNumberOfMessagesNotVisible'] || '0'),
+        delayed: parseInt(res.Attributes?.['ApproximateNumberOfMessagesDelayed'] || '0'),
+      };
     } catch (error) {
       console.error('Error fetching SQS metrics:', error);
-      return 0;
+      return { visible: 0, inFlight: 0, delayed: 0 };
     }
   }
 }

@@ -1,103 +1,97 @@
-# 🏗️ Technical Specification: AWS SQS Cloud Ecosystem
+# 🏗️ AWS Serverless Ecosystem: High-Performance SQS & Observability
 
-Este projeto implementa um ecossistema **Serverless** de alta performance, focado em **Arquitetura Event-Driven** e **Processamento Assíncrono**. A aplicação simula o ciclo de vida completo de um pedido de e-commerce: desde o recebimento via API Gateway até a persistência final em S3, utilizando uma fila SQS como amortecedor de carga e garantindo o desacoplamento total entre o produtor e o consumidor.
+Este projeto implementa um ecossistema **Serverless Enterprise-Ready**, focado em **Processamento Event-Driven** e **Observabilidade Profunda**. A aplicação automatiza o ciclo de vida de pedidos de e-commerce, utilizando SQS como buffer de carga e S3 para arquivamento definitivo, tudo monitorado por um Dashboard de controle em tempo real.
 
 ---
 
-## 🔄 Fluxo de Dados: Processamento de Pedidos e Eventos
+## 🔄 Fluxo de Observabilidade e Dados
 
-O diagrama abaixo detalha a coreografia de eventos. O **Produtor** libera o usuário quase instantaneamente (202 Accepted), enquanto o **Consumidor** processa o trabalho pesado em segundo plano através de gatilhos automáticos do SQS.
+O sistema não apenas processa dados, mas fornece uma janela completa para a saúde da infraestrutura. O diagrama abaixo descreve a coreografia entre o processamento e a captura de logs/métricas.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as React Dashboard
+    participant UI as Control Dashboard
     participant API as API Gateway
     participant Prod as Producer Lambda
-    participant SQS as SQS Queue (minha-fila)
-    participant Cons as Consumer Lambda
-    participant S3 as S3 Bucket (Arquivos)
+    participant SQS as SQS Queue
+    participant Cons as Consumer Lambda (Log Group)
+    participant S3 as S3 Data Lake
+    participant CW as CloudWatch Logs
 
-    Note over UI, S3: Fluxo de Escrita (Assíncrono)
-    UI->>API: POST /restapis/... (Order)
-    API->>Prod: Trigger Handler
-    Prod->>SQS: SendMessage (Payload)
-    Prod-->>UI: 202 Accepted {orderId}
+    Note over UI, S3: Ciclo de Vida do Pedido
+    UI->>API: POST /restapis/... (Simular Pedido)
+    Prod->>SQS: Dispatch Message
+    SQS->>Cons: Auto-Invoke (Trigger)
+    Cons->>S3: Archive Enriched JSON
+    Cons->>CW: Log Execution Details
 
-    Note over SQS, Cons: Event Source Mapping (Trigger)
-    SQS->>Cons: Polling & Invoke (Batch)
-    Cons->>S3: PutObject (Enriched JSON)
-    Note right of Cons: Registro Processado e Arquivado
-
-    Note over UI, S3: Fluxo de Monitoramento (Real-time Dashboard)
-    loop A cada 2 segundos
-        UI->>API: GET /restapis/... (Stats)
-        API->>Prod: Trigger Handler
-        Prod->>SQS: GetQueueAttributes (Backlog)
-        Prod->>S3: ListObjectsV2 (Event History)
-        Prod-->>UI: 200 OK {stats, orders[]}
+    Note over UI, CW: Monitoramento de Precisão (2s Polling)
+    loop Observabilidade Real-time
+        UI->>API: GET /restapis/... (Health Check)
+        API->>Prod: Fetch System Stats
+        Prod->>SQS: Get Depth (Visible/In-Flight)
+        Prod->>CW: Tail Latest Consumer Logs
+        Prod->>S3: List & Fetch Object Previews
+        Prod-->>UI: Unified Snapshot {sqs, s3, logs, orders}
     end
 ```
 
 ---
 
-## 📩 Detalhes do Processamento de Fila (SQS)
+## 🔮 Funcionalidades de Observabilidade (Deep Dive)
 
-A fila **SQS (Simple Queue Service)** atua como o sistema circulatório da aplicação. Ela não é apenas um local de armazenamento, mas um **disparador de eventos**.
+O projeto evoluiu de um teste simples para uma central de diagnóstico completa:
 
-- **Producer Side**: Ao receber um POST, a Lambda Producer valida o pedido e o despacha para o SQS. A mensagem contém o ID do pedido, o produto e a data de criação.
-- **Event Source Mapping (Trigger)**: Nós configuramos um gatilho na Lambda Consumer. A AWS (ou LocalStack) monitora a fila constantemente. Assim que uma mensagem entra, o SQS invoca a Lambda Consumer automaticamente.
-- **Batch Size**: O sistema está configurado com `batch-size 10`, o que significa que se houver muitos pedidos, a Lambda pode processar até 10 mensagens de uma só vez, otimizando custos e performance.
-- **Visibility Timeout**: Enquanto a Consumer está processando um pedido, a mensagem fica "invisível" para outros consumidores, garantindo que o mesmo pedido não seja processado duas vezes.
-
----
-
-## 🔩 Backend: Clean Architecture & Portabilidade
-
-O projeto utiliza **Clean Architecture** para separar as regras de negócio da tecnologia de nuvem. Isso permite trocar o LocalStack pela AWS real sem alterar o coração do sistema.
-
-- **Domain (`src/domain/`)**: Contém as Entidades (`Order`, `SystemStats`). É o código mais puro do projeto.
-- **Application (`src/application/`)**: Define as Interfaces (`Gateways`) e os Casos de Uso. Aqui reside a orquestração do que deve ser feito.
-- **Infrastructure (`src/infrastructure/`)**: Implementa a conexão real com SDKs. Utilizamos a lógica **Smart SDK** que detecta o ambiente (Local vs Cloud) automaticamente.
-- **Presentation (`src/presentation/`)**: Os Handlers das Lambdas que traduzem eventos da AWS para comandos do sistema.
+- **SQS Health Center**: Visualização detalhada de mensagens **Visible** (em espera), **In-Flight** (sendo processadas agora) e **Delayed**. Inclui um medidor de pressão de fila que alerta sobre possíveis congestionamentos.
+- **Integrated CloudWatch Stream**: Aba dedicada no dashboard que faz o tail automático dos logs da Lambda Consumidora. Visualize erros e confirmações de processamento em tempo real sem abrir o console da AWS.
+- **S3 Event Repository**: Tabela administrativa em linhas com **Paginação** e ordenação (mais recentes primeiro).
+- **Data Inspector**: Clique em "Details" em qualquer item da tabela para inspecionar o JSON bruto persistido no S3 através de um drawer interativo.
+- **Stress Testing Suíte**: Botões de `Simular x10` e `Simular x30` para gerar carga instantânea e observar a elasticidade da arquitetura.
 
 ---
 
-## 📦 Lifecycle de Deploy: LocalStack vs AWS Real
+## 🔩 Maturidade Técnica e Deploy
 
-Embora utilizemos o `start.sh` para facilitar o desenvolvimento local, o projeto foi construído pensando em um pipeline de produção profissional.
+### 🧠 Smart SDK Strategy
 
-### Como o código é preparado (Build):
+Os Gateways (`SQS`, `S3`, `CloudWatch`) utilizam uma lógica de **auto-detecção de ambiente**.
 
-1.  **TypeScript Transpiling**: O código é convertido para JavaScript compatível com o runtime `nodejs18.x`.
-2.  **Path Alias Resolution**: Utilizamos o `tsc-alias` para traduzir os caminhos `@src/*` em caminhos relativos dentro do `dist/`. Isso permite manter o código limpo no desenvolvimento e funcional no ZIP final.
-3.  **Arquivamento**: Todo o conteúdo da pasta `dist/` é compactado em um `function.zip`. Note que o Producer e o Consumer vivem no mesmo ZIP, mas são invocados por **Handlers diferentes**.
+- **LocalStack**: Usa endpoints locais (`localhost:4566`) e credenciais de teste.
+- **AWS Real**: Remove as configurações locais e permite que o SDK utilize o comportamento padrão da nuvem (IAM Roles, Endpoints globais). **O mesmo código roda nos dois mundos sem alterações.**
 
-### Estratégia de Deploy em Produção:
+### 📦 Optimized Lambda Package
 
-Para subir na AWS real de verdade, os passos seriam:
+O pipeline de build (`npm run build:zip`) foi configurado para gerar um artefato profissional:
 
-1.  **Provisionamento**: Recomendamos o uso de **AWS CDK** (TypeScript) para criar o S3, SQS, API Gateway e as IAM Roles.
-2.  **IAM Roles (Permissões)**: Na AWS real, as Lambdas precisam de "permissão explícita" para ler da fila e escrever no bucket.
-3.  **CI/CD**: Um pipeline no GitHub Actions executaria `npm run build`, geraria o ZIP e usaria o comando `aws lambda update-function-code` para atualizar o código na nuvem.
-4.  **Frontend**: O dashboard React (Vite) seria buildado e enviado para um **Bucket S3 Estático** servido pelo **AWS CloudFront (CDN)** para máxima performance.
+- **Tree-shaking**: Apenas o código backend e interfaces são incluídos.
+- **No Bloat**: Arquivos de UI e configurações de build do frontend são removidos do ZIP, resultando em um pacote leve e de inicialização rápida (Cold Start reduzido).
+- **Path Aliases**: Suporte completo a `@src/*` mapeado para caminhos relativos no runtime.
 
 ---
 
-## 🚀 Como Executar Localmente
+## 🚀 Guia de Execução
 
-O projeto possui um **Modo Full Dev** que sobe tudo de uma vez:
+Inicie o ecossistema completo com um único comando:
 
 ```bash
 npm run dev:full
 ```
 
-Este comando executa:
+### Comandos de Utilidade (AWS CLI):
 
-1.  **`start.sh`**: Sobe o docker (LocalStack), cria o Bucket, a Fila, a Fila e as Lambdas.
-2.  **`watch:local`**: Inicia o `nodemon` que vigia a pasta `src/`. Se você mudar o código do backend, ele faz o build e o deploy na Lambda local automaticamente!
-3.  **`vite`**: Sobe o painel de controle React.
+Se desejar validar dados manualmente via terminal (lembrando de usar o seu endpoint local):
+
+```bash
+# Ver Logs da Consumidora via CLI
+aws --endpoint-url=http://localhost:4566 logs tail /aws/lambda/my-consumer-lambda --watch
+
+# Consultar métricas profundas da fila
+aws --endpoint-url=http://localhost:4566 sqs get-queue-attributes \
+  --queue-url http://localhost:4566/000000000000/minha-fila-arquivos \
+  --attribute-names All
+```
 
 ---
 
-**Developed with Precision & Scalability in mind.**
+**Built with Clean Architecture, SOLID and Cloud-Native best practices.**

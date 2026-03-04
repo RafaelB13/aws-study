@@ -7,7 +7,16 @@ export interface Order {
 }
 
 export interface SystemStats {
-  sqsCount: number;
+  sqs: {
+    visible: number;
+    inFlight: number;
+    delayed: number;
+  };
   s3Count: number;
   orders: Order[];
+  logs: {
+    message: string;
+    timestamp: string;
+    stream?: string;
+  }[];
 }

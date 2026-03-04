@@ -1,8 +1,8 @@
-import { Order, SystemStats } from '@src/domain/entities';
+import { Order } from '@src/domain/entities';
 
 export interface IQueueGateway {
   sendToQueue(order: Order): Promise<void>;
-  getQueueMetrics(): Promise<number>;
+  getQueueMetrics(): Promise<{ visible: number; inFlight: number; delayed: number; }>;
 }
 
 export interface IStorageGateway {
@@ -11,6 +11,6 @@ export interface IStorageGateway {
   listOrders(): Promise<Order[]>;
 }
 
-export interface IMonitoringGateway {
-  getSystemStatus(): Promise<SystemStats>;
+export interface ILoggingGateway {
+  getRecentLogs(logGroupName: string, limit?: number): Promise<{ message: string; timestamp: string; stream: string }[]>;
 }

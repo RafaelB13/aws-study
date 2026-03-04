@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react';
 
 export interface Stats {
-  sqsCount: number;
+  sqs: {
+    visible: number;
+    inFlight: number;
+    delayed: number;
+  };
   s3Count: number;
   orders: any[];
+  logs: any[];
 }
 
 export const useAwsStats = (apiUrl: string) => {
-  const [stats, setStats] = useState<Stats>({ sqsCount: 0, s3Count: 0, orders: [] });
+  const [stats, setStats] = useState<Stats>({ 
+    sqs: { visible: 0, inFlight: 0, delayed: 0 }, 
+    s3Count: 0, 
+    orders: [],
+    logs: []
+  });
 
   useEffect(() => {
     if (!apiUrl) return;
@@ -17,9 +27,10 @@ export const useAwsStats = (apiUrl: string) => {
         const response = await fetch(apiUrl, { method: 'GET' });
         const data = await response.json();
         setStats({
-          sqsCount: data.sqsCount || 0,
+          sqs: data.sqs || { visible: 0, inFlight: 0, delayed: 0 },
           s3Count: data.s3Count || 0,
-          orders: data.orders || []
+          orders: data.orders || [],
+          logs: data.logs || []
         });
       } catch (err) {
         // Silent error

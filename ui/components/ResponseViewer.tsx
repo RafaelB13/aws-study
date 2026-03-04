@@ -7,17 +7,16 @@ interface ResponseViewerProps {
 }
 
 export const ResponseViewer: React.FC<ResponseViewerProps> = ({ data, status, loading }) => {
-  if (!data && !loading) return null;
-
   const isError = status.includes('ERROR') || (status.split(' ')[0] && parseInt(status.split(' ')[0]) >= 400);
-  const isPending = status === 'WAITING';
+  const isPending = status === 'WAITING' || status === 'BULK PROCESSING';
+  const isReady = !data && !loading;
 
   return (
-    <div className={`mt-8 transition-opacity duration-500 ${data || loading ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`mt-0 transition-opacity duration-500 opacity-100`}>
       <div className="flex items-center gap-2 mb-3">
-        <span className={`flex w-3 h-3 rounded-full ${isPending ? 'bg-yellow-400 animate-pulse' : isError ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]' : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]'}`}></span>
-        <h3 className="text-sm font-semibold text-slate-300">
-          Retorno da AWS Lambda:
+        <span className={`flex w-3 h-3 rounded-full ${isReady ? 'bg-slate-500' : isPending ? 'bg-yellow-400 animate-pulse' : isError ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]' : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]'}`}></span>
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          {isReady ? 'System Ready' : 'Lambda Execution Log'}
         </h3>
       </div>
       <div

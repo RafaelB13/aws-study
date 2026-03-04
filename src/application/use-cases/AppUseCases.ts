@@ -1,4 +1,4 @@
-import { IQueueGateway, IStorageGateway } from '@src/application/interfaces/Gateways';
+import { ILoggingGateway, IQueueGateway, IStorageGateway } from '@src/application/interfaces/Gateways';
 import { Order, SystemStats } from '@src/domain/entities';
 
 export class CreateOrderUseCase {
@@ -31,16 +31,18 @@ export class ProcessOrderUseCase {
 export class GetSystemStatusUseCase {
   constructor(
     private readonly queueGateway: IQueueGateway,
-    private readonly storageGateway: IStorageGateway
+    private readonly storageGateway: IStorageGateway,
+    private readonly loggingGateway: ILoggingGateway
   ) {}
 
   async execute(): Promise<SystemStats> {
-    const [sqsCount, s3Count, orders] = await Promise.all([
+    const [sqs, s3Count, orders, logs] = await Promise.all([
       this.queueGateway.getQueueMetrics(),
       this.storageGateway.getStorageMetrics(),
-      this.storageGateway.listOrders()
+      this.storageGateway.listOrders(),
+      this.loggingGateway.getRecentLogs('/aws/lambda/my-consumer-lambda', 20)
     ]);
 
-    return { sqsCount, s3Count, orders };
+    return { sqs, s3Count, orders, logs };
   }
 }

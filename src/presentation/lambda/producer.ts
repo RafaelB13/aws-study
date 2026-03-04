@@ -3,15 +3,18 @@ import { S3Gateway } from '@src/infrastructure/aws/S3Gateway';
 import { SQSGateway } from '@src/infrastructure/aws/SQSGateway';
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 
+import { CloudWatchGateway } from '@src/infrastructure/aws/CloudWatchGateway';
+
 const endpoint = process.env.LOCALSTACK_HOSTNAME 
   ? `http://${process.env.LOCALSTACK_HOSTNAME}:4566` 
   : 'http://localhost.localstack.cloud:4566';
 
 const sqsGateway = new SQSGateway(endpoint);
 const s3Gateway = new S3Gateway(endpoint);
+const cwGateway = new CloudWatchGateway(endpoint);
 
 const createOrderUseCase = new CreateOrderUseCase(sqsGateway);
-const getStatusUseCase = new GetSystemStatusUseCase(sqsGateway, s3Gateway);
+const getStatusUseCase = new GetSystemStatusUseCase(sqsGateway, s3Gateway, cwGateway);
 
 export const handler = async (event: APIGatewayProxyEvent, context: Context): Promise<APIGatewayProxyResult> => {
   if (event.httpMethod === 'GET') {

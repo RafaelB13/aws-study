@@ -6,3 +6,4 @@ coverage/
 *.d.ts.map
 *.zip
 .DS_Store
+volume/
