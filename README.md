@@ -11,24 +11,24 @@ Este projeto implementa um ecossistema **Serverless Enterprise-Ready**, focado e
 O ecossistema é dividido em dois processos paralelos: o **Processamento de Pedidos** (Assíncrono) e o **Monitoramento em Tempo Real** (Polling).
 
 ```mermaid
-flowchart TD
-    subgraph EventFlow ["🚀 Fluxo de Eventos (Assíncrono)"]
-        A[Dashboard UI] -- simula --> B[Producer Lambda]
-        B -- envia --> C{SQS Queue}
-        C -- gatilho --> D[Consumer Lambda]
-        D -- persiste --> E[(S3 Data Lake)]
-        D -- gera --> F[[CloudWatch Logs]]
+flowchart LR
+    subgraph Process ["🚀 Messaging Flow"]
+        A[Dashboard] -- Dispatch --> B[Producer]
+        B -- Queue --> C{SQS}
+        C -- Trigger --> D[Consumer]
+        D -- Persistence --> E[(S3)]
+        D -- Records --> F[[CloudWatch]]
     end
 
-    subgraph MonitorFlow ["📊 Fluxo de Observabilidade"]
-        G[Dashboard UI] -- polling métricas/logs --> B
-        B -- profundidade --> C
-        B -- conteúdos --> E
-        B -- logs --> F
+    subgraph Monitor ["📊 Monitoring Flow"]
+        G[Dashboard] -- Dashboard API --> B
+        B -.->|Metrics| C
+        B -.->|Files| E
+        B -.->|Logs| F
     end
 
-    style EventFlow fill:#1e293b,stroke:#334155,color:#fff
-    style MonitorFlow fill:#0f172a,stroke:#334155,color:#fff
+    style Process fill:#1e293b,stroke:#334155,color:#fff
+    style Monitor fill:#0f172a,stroke:#334155,color:#fff
 ```
 
 ---
@@ -39,9 +39,10 @@ O projeto evoluiu de um teste simples para uma central de diagnóstico completa:
 
 - **SQS Health Center**: Visualização detalhada de mensagens **Visible** (em espera), **In-Flight** (sendo processadas agora) e **Delayed**. Inclui um medidor de pressão de fila que alerta sobre possíveis congestionamentos.
 - **Integrated CloudWatch Stream**: Aba dedicada no dashboard que faz o tail automático dos logs da Lambda Consumidora. Visualize erros e confirmações de processamento em tempo real sem abrir o console da AWS.
-- **S3 Event Repository**: Tabela administrativa em linhas com **Paginação** e ordenação (mais recentes primeiro).
-- **Data Inspector**: Clique em "Details" em qualquer item da tabela para inspecionar o JSON bruto persistido no S3 através de um drawer interativo.
-- **Stress Testing Suíte**: Botões de `Simular x10` e `Simular x30` para gerar carga instantânea e observar a elasticidade da arquitetura.
+- **S3 Event Repository**: Tabela administrativa em linhas com **Paginação**, ordenação (mais recentes primeiro) e reporte de tamanho de arquivo.
+- **Data Inspector**: Clique em "Details" em qualquer item para inspecionar o JSON bruto persistido no S3 através de um drawer interativo.
+- **Métricas de Armazenamento**: Cálculo em tempo real do footprint total de armazenamento (tamanho cumulativo) no seu S3 Data Lake.
+- **Stress Testing Suite**: Botões de `Simular x10` e `Simular x30` para gerar carga instantânea e observar a elasticidade da arquitetura.
 
 ---
 
@@ -84,6 +85,9 @@ aws --endpoint-url=http://localhost:4566 logs tail /aws/lambda/my-consumer-lambd
 aws --endpoint-url=http://localhost:4566 sqs get-queue-attributes \
   --queue-url http://localhost:4566/000000000000/minha-fila-arquivos \
   --attribute-names All
+
+# Listar arquivos no S3
+aws --endpoint-url=http://localhost:4566 s3 ls s3://meu-bucket-arquivos --recursive
 ```
 
 ---
