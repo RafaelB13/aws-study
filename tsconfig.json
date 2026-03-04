@@ -4,6 +4,11 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["src/*"],
+      "@ui/*": ["ui/*"]
+    },
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,

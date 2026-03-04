@@ -1,7 +1,7 @@
+import { CreateOrderUseCase, GetSystemStatusUseCase } from '@src/application/use-cases/AppUseCases';
+import { S3Gateway } from '@src/infrastructure/aws/S3Gateway';
+import { SQSGateway } from '@src/infrastructure/aws/SQSGateway';
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
-import { CreateOrderUseCase, GetSystemStatusUseCase } from '../../application/use-cases/AppUseCases';
-import { S3Gateway } from '../../infrastructure/aws/S3Gateway';
-import { SQSGateway } from '../../infrastructure/aws/SQSGateway';
 
 const endpoint = process.env.LOCALSTACK_HOSTNAME 
   ? `http://${process.env.LOCALSTACK_HOSTNAME}:4566` 

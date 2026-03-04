@@ -1,5 +1,5 @@
+import { useAwsStats } from '@ui/hooks/useAwsStats';
 import React from 'react';
-import { useAwsStats } from '../hooks/useAwsStats';
 
 interface DashboardProps {
   apiUrl: string;

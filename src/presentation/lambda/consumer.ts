@@ -1,6 +1,6 @@
+import { ProcessOrderUseCase } from '@src/application/use-cases/AppUseCases';
+import { S3Gateway } from '@src/infrastructure/aws/S3Gateway';
 import { SQSEvent, SQSHandler } from 'aws-lambda';
-import { ProcessOrderUseCase } from '../../application/use-cases/AppUseCases';
-import { S3Gateway } from '../../infrastructure/aws/S3Gateway';
 
 const endpoint = process.env.LOCALSTACK_HOSTNAME 
   ? `http://${process.env.LOCALSTACK_HOSTNAME}:4566` 

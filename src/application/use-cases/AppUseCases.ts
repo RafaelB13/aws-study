@@ -1,5 +1,5 @@
-import { Order, SystemStats } from '../../domain/entities';
-import { IQueueGateway, IStorageGateway } from '../interfaces/Gateways';
+import { IQueueGateway, IStorageGateway } from '@src/application/interfaces/Gateways';
+import { Order, SystemStats } from '@src/domain/entities';
 
 export class CreateOrderUseCase {
   constructor(private readonly queueGateway: IQueueGateway) {}

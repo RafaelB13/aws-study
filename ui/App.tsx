@@ -1,9 +1,9 @@
+import { Dashboard } from '@ui/components/Dashboard';
+import { OrderForm } from '@ui/components/OrderForm';
+import { ResponseViewer } from '@ui/components/ResponseViewer';
+import { useLocalStorage } from '@ui/hooks/useLocalStorage';
+import { useOrderAction } from '@ui/hooks/useOrderAction';
 import React from 'react';
-import { Dashboard } from './components/Dashboard';
-import { OrderForm } from './components/OrderForm';
-import { ResponseViewer } from './components/ResponseViewer';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { useOrderAction } from './hooks/useOrderAction';
 
 export const App: React.FC = () => {
   const [apiUrl, setApiUrl] = useLocalStorage<string>(

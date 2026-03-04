@@ -1,94 +1,92 @@
-# ☁️ SQS & S3 LocalStack (Serverless Message Broker)
+# 🚀 AWS Serverless LocalStack Ecosystem (SQS + S3 + Lambda)
 
-Atendendo às necessidades de arquiteturas robustas e escaláveis, introduzimos mensagens assíncronas no sistema (Fila!). Tudo operando 100% no servidor falso de testes LocalStack.
-
----
-
-## 🏗️ Como Funciona o Novo Fluxo com Fila (SQS)?
-
-Imagine novamente o nosso antigo Restaurante Fast-Food (O Frontend). Mas desta vez, o nosso Cozinheiro (A Função Lambda original) ficou abarrotado de serviço, travando na hora de guardar centenas de pacotes grandes no S3 na sexta-feira à noite e demorando para entregar a Notinha (Retorno 201) pro Cliente.
-
-Como resolver isso? Criamos uma **Fila de Tickets** para desmembrar o fluxo em duas etapas (Produtor x Consumidor)!
-
-1. **📱 O Cliente (Frontend)**
-   O Front end não aguarda mais a gravação demorada do "Pacote no Estoque S3". Ele avisa o Garçom que quer mandar um item.
-
-2. **🤵‍♂️ O Garçom (API Gateway)**
-   Roteia a sua comanda até o "Caixa" da cozinha.
-
-3. **📝 Lambda Produtora ("O Caixa")** `[src/producer.ts]`
-   Assim que recebemos do API GW, o "Caixa" só faz duas coisas:
-   a) Cola os dados do seu upload literalmente em um Post-it (_Message_)
-   b) Joga na Fila SQS e responde na mesma hora: *"Pode ir, Sr. Cliente (Retornando Http *202 Accepted*)! Seu pedido já está na esteira!"*
-
-4. **🗃️ O Quadro de Fila SQS (Simple Queue Service)**
-   A fila fica enfileirando todos os Post-its com requisições que chegam do Frontend. Eles podem chegar aos milhares. A SQS garante que nenhum papel seja rasgado ou perdido!
-
-5. **👨‍🍳 Lambda Consumidora ("O Repositor de Estoque")** `[src/consumer.ts]`
-   Esta SEGUNDA (nova) AWS Lambda trabalha totalmente nos fundos, fora da visão do cliente.
-   Sempre que cai algo na "Fila", essa Lambda de estoque é acordada (_Lambda Trigger_). Ela pega 10 papéis da fila por vez, lê o texto que você inseriu neles e envia eles para nosso antigo Estoque S3 (`meu-bucket-arquivos`) no tempo dela!
-
-```mermaid
-sequenceDiagram
-    participant App as 🖥️ Aplicação Cliente
-    participant APIGW as 🌐 API Gateway
-    participant P_Lambda as 📝 Lambda Produtora
-    participant SQS as 🗃️ Fila AWS SQS
-    participant C_Lambda as 👨‍🍳 Lambda Consumidora
-    participant S3 as 🪣 AWS S3
-
-    App->>APIGW: 1. POST /hello (Dados)
-    APIGW->>P_Lambda: 2. Encaminha p/ Produtora
-    P_Lambda->>SQS: 3. Joga na Fila e Corre! (Sqs::SendMessage)
-    P_Lambda-->>APIGW: 4. Devolve HTTP 202 (Accepted) Rápido!
-    APIGW-->>App: 5. Cliente Recebe Sucesso Sem Esperar o S3
-
-    %% Trabalho Oculto Lento %%
-    Note right of SQS: Nos bastidores e de forma Assíncrona:
-    SQS-)C_Lambda: 6. Acorda o Consumidor c/ Pacotão SQS Event
-    activate C_Lambda
-    C_Lambda->>S3: 7. Trabalha lento guardando no AWS S3
-    S3-->>C_Lambda: 8. Gravação Concluída (AWS SDK)
-    deactivate C_Lambda
-```
+Bem-vindo ao projeto **Lambda Uploader**! Esta aplicação demonstra um fluxo completo de processamento assíncrono utilizando serviços AWS emulados localmente via **LocalStack**. O projeto foi construído com foco em **Clean Architecture** no backend e **React Moderno** (Hooks) no frontend.
 
 ---
 
-## 🚀 Como Simular Isso Agora?
+## 🛠️ Detalhes Tecnológicos
 
-Basta configurar a sua própria Infra local na seguinte sequência:
+- **Backend**: Node.js 18 + TypeScript (com Path Aliases `@src`).
+- **Infrastructure**: LocalStack (S3, SQS, Lambda, API Gateway).
+- **Frontend**: React + Vite + Tailwind CSS 4 (com Path Aliases `@ui`).
+- **Architecture**: Clean Architecture (Domain, Application, Infrastructure, Presentation).
 
-### 1. Preparar a Infraestrutura e o Setup Local (IaC)
+---
 
-No seu terminal, digite o seguinte comando por comando. De quebra, apredemos a utilidade de cada ferramenta oficial de Devops do Localstack.
+## 🏗️ Arquitetura do Sistema (Fluxo de Dados)
+
+O fluxo de processamento funciona da seguinte forma:
+
+1.  **Frontend (React)**: O usuário aciona o botão "Simular Compra". O site faz um `POST` para o endpoint do **API Gateway**.
+2.  **Producer Lambda**: O API Gateway dispara a Lambda Produtora. Ela gera um objeto de pedido (`Order`) aleatório e o envia para uma fila **SQS**.
+3.  **SQS (Queue)**: A fila recebe o pedido e, através de um **Event Source Mapping**, "acorda" a Lambda Consumidora.
+4.  **Consumer Lambda**: A consumidora processa a mensagem da fila e persiste o JSON do pedido dentro de um bucket **S3**.
+5.  **Dashboard Online**: O frontend realiza um `GET` periódico para a Lambda Produtora (que atua como um proxy seguro) para ler métricas do SQS e S3 em tempo real, contornando limitações de CORS do LocalStack.
+
+---
+
+## 📦 Como as Lambdas são Geradas e Implantadas?
+
+O processo de "nascimento" das Lambdas neste projeto segue um pipeline rigoroso de build para garantir que o TypeScript rode corretamente no ambiente Node.js da AWS:
+
+### 1. Compilação (O Passo TypeScript)
+
+Como as Lambdas rodam em arquivos `.js` comuns, primeiro usamos o comando:
 
 ```bash
-# 1. Instala as dependências novas do AWS SDK da SQS
-npm install
-
-# 2. Cria o Salão de Estoque do S3 como já faziamos
-npm run s3:local
-
-# 3. Compilação TypeScript e Cadastro das DUAS as Lambdas (O Caixa e o Repositor) pelo "aws lambda create-function"
-npm run deploy:local
-
-# 4. **A MÁGICA SURGE** - O Quadro de Filas (A SQS).
-# Ele cria a Fila e já ensina ela a injetar mensagens diretamente no Repositor "Consumer" (Event Source Mapping).
-npm run sqs:local
-
-# 5. O Garçom (A URL). Aponta todas as rotas da Web pro "Caixa/Producer".
-npm run api:local
+npm run build # (tsc -p tsconfig.server.json)
 ```
 
-_(⚠️ Guarde aquela URL do "Postman" que esse último comando jogar na tela)_
+Ele compila apenas os arquivos do backend (`src/`) usando uma configuração específica que resolve os **Path Aliases** e gera a pasta `dist/`.
 
-### 2. Brinque no Frontend de Forma Assíncrona!
+### 2. Empacotamento (O Passo ZIP)
+
+Diferente de um site, a AWS exige que o código da Lambda seja enviado em um arquivo `.zip`. Usamos o comando:
 
 ```bash
-# Roda a UI
-npm run dev
+npm run build:zip
 ```
 
-1. Acesse `http://localhost:5174/` e abra a aba "Network" e os "Logs/Terminal" do Docker caso queira analisar o que muda em velocidade.
-2. Agora, toda vez que apertar p/ enviar, o tempo de reposta da interface será o triplo mais rápido pois ela caiu na fila sem testar se a Amazon tava disposta a salvar naquele exato segundo em disco!
-3. Você pode usar sua AWS CLI `aws --endpoint-url=... s3 ls` pra atestar que em algum momento não listado no frontend o S3 foi atualizado!
+Ele entra na pasta `dist/` e gera um arquivo `function.zip` contendo os executáveis JavaScript.
+
+### 3. Deploy/Update no LocalStack
+
+O script principal (`start.sh`) verifica se a Lambda já existe:
+
+- **Se não existe**: Cria a função (`create-function`) definindo o nome, runtime (`nodejs18.x`), o handler (ex: `src/presentation/lambda/producer.handler`) e envia o ZIP.
+- **Se já existe**: Apenas atualiza o código fonte (`update-function-code`), permitindo iterações rápidas sem precisar deletar a infraestrutura.
+
+---
+
+## 🚀 Como Executar Absolute Tudo (O Botão Vermelho)
+
+Para rodar o ecossistema completo (Docker, Infra AWS e Frontend), basta um único comando:
+
+```bash
+npm run server
+```
+
+Este comando executa o script `start.sh`, que:
+
+1.  Inicia o contêiner do **Docker Compose**.
+2.  Aguardat até que o **LocalStack** esteja saudável.
+3.  Cria o Bucket S3 e a Fila SQS.
+4.  Compila e faz o deploy das duas Lambdas.
+5.  Configura as rotas e o CORS do API Gateway.
+6.  Salva a URL gerada no seu arquivo `.env.local`.
+7.  Inicia o servidor de desenvolvimento do **Vite (React)**.
+
+---
+
+## 📁 Organização de Pastas (Clean Architecture)
+
+- `src/domain`: Entidades de negócio (onde o "Pedido" é definido).
+- `src/application`: Use Cases (a lógica de _o que_ deve acontecer).
+- `src/infrastructure`: Gateways AWS (a implementação técnica de _como_ o S3/SQS é acessado).
+- `src/presentation`: Handlers das Lambdas (os pontos de entrada).
+- `ui/components`: Partes visuais do React.
+- `ui/hooks`: Toda a inteligência reativa (ex: `useAwsStats`).
+
+---
+
+**Desenvolvido com 🚀 e Antigravity.**

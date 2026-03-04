@@ -1,4 +1,4 @@
-import { Order, SystemStats } from '../../domain/entities';
+import { Order, SystemStats } from '@src/domain/entities';
 
 export interface IQueueGateway {
   sendToQueue(order: Order): Promise<void>;

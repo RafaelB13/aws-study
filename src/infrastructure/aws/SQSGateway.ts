@@ -1,6 +1,6 @@
 import { GetQueueAttributesCommand, SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
-import { IQueueGateway } from '../../application/interfaces/Gateways';
-import { Order } from '../../domain/entities';
+import { IQueueGateway } from '@src/application/interfaces/Gateways';
+import { Order } from '@src/domain/entities';
 
 export class SQSGateway implements IQueueGateway {
   private readonly sqsClient: SQSClient;

@@ -1,6 +1,6 @@
 import { ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { IStorageGateway } from '../../application/interfaces/Gateways';
-import { Order } from '../../domain/entities';
+import { IStorageGateway } from '@src/application/interfaces/Gateways';
+import { Order } from '@src/domain/entities';
 
 export class S3Gateway implements IStorageGateway {
   private readonly s3Client: S3Client;
