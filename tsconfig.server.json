@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "ui/**/*",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "vite.config.ts"
+  ]
+}

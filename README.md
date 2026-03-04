@@ -1,107 +1,94 @@
-# ☁️ S3 LocalStack Serverless Uploader
+# ☁️ SQS & S3 LocalStack (Serverless Message Broker)
 
-Este repositório demonstra a construção de uma aplicação _Full-Stack Serverless_ operando inteiramente em ambiente local. A arquitetura simula com precisão serviços da Amazon Web Services (AWS) utilizando o **LocalStack**, orquestrando uma comunicação ponta a ponta desde uma interface web (Frontend) até o armazenamento em nuvem (Backend).
+Atendendo às necessidades de arquiteturas robustas e escaláveis, introduzimos mensagens assíncronas no sistema (Fila!). Tudo operando 100% no servidor falso de testes LocalStack.
 
 ---
 
-## 🏗️ Arquitetura e Fluxo de Dados
+## 🏗️ Como Funciona o Novo Fluxo com Fila (SQS)?
 
-A infraestrutura é desenhada utilizando os seguintes componentes principais da nuvem:
+Imagine novamente o nosso antigo Restaurante Fast-Food (O Frontend). Mas desta vez, o nosso Cozinheiro (A Função Lambda original) ficou abarrotado de serviço, travando na hora de guardar centenas de pacotes grandes no S3 na sexta-feira à noite e demorando para entregar a Notinha (Retorno 201) pro Cliente.
 
-1. **🧑‍� Aplicação Cliente (Vite/TailwindCSS):**
-   Interface de usuário (Frontend) desenvolvida em TypeScript. Captura os dados inseridos pelo usuário (nome e conteúdo do arquivo) e aciona a API de backend através de requisições assíncronas (HTTP POST).
+Como resolver isso? Criamos uma **Fila de Tickets** para desmembrar o fluxo em duas etapas (Produtor x Consumidor)!
 
-2. **🌐 AWS API Gateway:**
-   Atua como o ponto de entrada (roteador) seguro da infraestrutura. O API Gateway gerencia o tráfego de rede, lida com as permissões de segurança de navegadores (CORS/Preflight Headers via método `OPTIONS`) e encaminha a requisição de upload validada para o processamento.
+1. **📱 O Cliente (Frontend)**
+   O Front end não aguarda mais a gravação demorada do "Pacote no Estoque S3". Ele avisa o Garçom que quer mandar um item.
 
-3. **⚙️ AWS Lambda (Node.js/TypeScript):**
-   A camada computacional. Nossa função _Serverless_ (`src/handler.ts`) recebe o pacote do Gateway, processa o arquivo JSON em memória, instancia o SDK oficial da AWS e submete o objeto formatado ao serviço de armazenamento.
+2. **🤵‍♂️ O Garçom (API Gateway)**
+   Roteia a sua comanda até o "Caixa" da cozinha.
 
-4. **🪣 Amazon S3 (Simple Storage Service):**
-   O serviço de persistência de dados. Recebe o conteúdo processado pela AWS Lambda e o grava definitivamente de forma segura dentro de um _Bucket_ (um contêiner virtual de armazenamento).
+3. **📝 Lambda Produtora ("O Caixa")** `[src/producer.ts]`
+   Assim que recebemos do API GW, o "Caixa" só faz duas coisas:
+   a) Cola os dados do seu upload literalmente em um Post-it (_Message_)
+   b) Joga na Fila SQS e responde na mesma hora: *"Pode ir, Sr. Cliente (Retornando Http *202 Accepted*)! Seu pedido já está na esteira!"*
 
-### Diagrama de Sequência (Ponta a Ponta)
+4. **🗃️ O Quadro de Fila SQS (Simple Queue Service)**
+   A fila fica enfileirando todos os Post-its com requisições que chegam do Frontend. Eles podem chegar aos milhares. A SQS garante que nenhum papel seja rasgado ou perdido!
+
+5. **👨‍🍳 Lambda Consumidora ("O Repositor de Estoque")** `[src/consumer.ts]`
+   Esta SEGUNDA (nova) AWS Lambda trabalha totalmente nos fundos, fora da visão do cliente.
+   Sempre que cai algo na "Fila", essa Lambda de estoque é acordada (_Lambda Trigger_). Ela pega 10 papéis da fila por vez, lê o texto que você inseriu neles e envia eles para nosso antigo Estoque S3 (`meu-bucket-arquivos`) no tempo dela!
 
 ```mermaid
 sequenceDiagram
-    participant App as �️ Aplicação Cliente
+    participant App as 🖥️ Aplicação Cliente
     participant APIGW as 🌐 API Gateway
-    participant Lambda as ⚙️ AWS Lambda
+    participant P_Lambda as 📝 Lambda Produtora
+    participant SQS as 🗃️ Fila AWS SQS
+    participant C_Lambda as 👨‍🍳 Lambda Consumidora
     participant S3 as 🪣 AWS S3
 
-    App->>APIGW: 1. Inicia requisição HTTP POST
-    Note right of App: Preflight CORS validado em milissegundos
-    APIGW->>Lambda: 2. Encaminha o evento (Event/Context)
-    activate Lambda
-    Lambda->>S3: 3. Executa PutObjectCommand (AWS SDK)
-    activate S3
-    S3-->>Lambda: 4. Retorna status de gravação
-    deactivate S3
-    Lambda-->>APIGW: 5. Retorna resposta padronizada (Ex: 201 Created)
-    deactivate Lambda
-    APIGW-->>App: 6. Resolve a requisição e exibe o JSON de sucesso
+    App->>APIGW: 1. POST /hello (Dados)
+    APIGW->>P_Lambda: 2. Encaminha p/ Produtora
+    P_Lambda->>SQS: 3. Joga na Fila e Corre! (Sqs::SendMessage)
+    P_Lambda-->>APIGW: 4. Devolve HTTP 202 (Accepted) Rápido!
+    APIGW-->>App: 5. Cliente Recebe Sucesso Sem Esperar o S3
+
+    %% Trabalho Oculto Lento %%
+    Note right of SQS: Nos bastidores e de forma Assíncrona:
+    SQS-)C_Lambda: 6. Acorda o Consumidor c/ Pacotão SQS Event
+    activate C_Lambda
+    C_Lambda->>S3: 7. Trabalha lento guardando no AWS S3
+    S3-->>C_Lambda: 8. Gravação Concluída (AWS SDK)
+    deactivate C_Lambda
 ```
 
 ---
 
-## 🛠️ Tecnologias e Ferramentas
+## 🚀 Como Simular Isso Agora?
 
-- **Infraestrutura Cloud Simulado:** Docker e [LocalStack](https://localstack.cloud/)
-- **Backend:** Node.js, TypeScript, AWS SDK v3, Jest (Testes Unitários Unitários com Mocking)
-- **Frontend:** Vite, TypeScript, TailwindCSS v4
-- **Automação:** Shell Scripts Integrados (`package.json`)
+Basta configurar a sua própria Infra local na seguinte sequência:
 
----
+### 1. Preparar a Infraestrutura e o Setup Local (IaC)
 
-## � Guia Rápido de Instalação e Execução
-
-Todo o fluxo de provisionamento (_IaC - Infrastructure as Code_) de certa forma foi abstraído através de _scripts_ construídos para facilitar os estudos locais.
-
-### 1. Iniciar o Simulador de Nuvem
-
-Certifique-se de que o Docker está operando na sua máquina e inicie os contêineres:
+No seu terminal, digite o seguinte comando por comando. De quebra, apredemos a utilidade de cada ferramenta oficial de Devops do Localstack.
 
 ```bash
-docker compose up -d
-```
+# 1. Instala as dependências novas do AWS SDK da SQS
+npm install
 
-_(O LocalStack alocará seus serviços simulados na porta 4566 do painel localhost)._
-
-### 2. Provisionamento (Deploy) da Infraestrutura
-
-Na raiz do projeto em seu terminal, execute rigorosamente a ordem abaixo para provisionar os serviços na AWS simulada:
-
-```bash
-# Etapa 1: Cria o "Cofre" permanente no Amazon S3
+# 2. Cria o Salão de Estoque do S3 como já faziamos
 npm run s3:local
 
-# Etapa 2: Compila a função Lambda e a entrega compactada (.zip) para a AWS
+# 3. Compilação TypeScript e Cadastro das DUAS as Lambdas (O Caixa e o Repositor) pelo "aws lambda create-function"
 npm run deploy:local
 
-# Etapa 3: Cria as rotas e regras de HTTP (CORS) no API Gateway e devolve uma URL
+# 4. **A MÁGICA SURGE** - O Quadro de Filas (A SQS).
+# Ele cria a Fila e já ensina ela a injetar mensagens diretamente no Repositor "Consumer" (Event Source Mapping).
+npm run sqs:local
+
+# 5. O Garçom (A URL). Aponta todas as rotas da Web pro "Caixa/Producer".
 npm run api:local
 ```
 
-> ⚠️ **Atenção:** O último comando (`api:local`) gerará uma URL exclusiva para o Gateway (Ex: `http://localhost:4566/restapis/XXX/dev/_user_request_/hello`). **Copie e guarde esta URL.**
+_(⚠️ Guarde aquela URL do "Postman" que esse último comando jogar na tela)_
 
-### 3. Iniciar a Interface Gráfica
-
-Com a infraestrutura provisionada, inicie o servidor de desenvolvimento do Frontend:
+### 2. Brinque no Frontend de Forma Assíncrona!
 
 ```bash
+# Roda a UI
 npm run dev
 ```
 
-1. Acesse `http://localhost:5174/` utilizando seu navegador de preferência.
-2. Insira a **URL do API Gateway** copiada no Passo 2 no campo correspondente.
-3. Preencha os detalhes do arquivo e simule um envio de dados para ambiente de produção (local)!
-
-### 🧪 Observações sobre Ciclo de Desenvolvimento (Testes Unitários)
-
-Para testar isoladamente as regras de negócio escritas na função Lambda através do Jest sem depender de instâncias Docker:
-
-```bash
-npm run test
-```
-
-Sempre que efetuar mudanças no código-fonte `src/handler.ts`, utilize **`npm run update:local`** para enviar as atualizações sem a necessidade de recriar os provisionamentos do zero.
+1. Acesse `http://localhost:5174/` e abra a aba "Network" e os "Logs/Terminal" do Docker caso queira analisar o que muda em velocidade.
+2. Agora, toda vez que apertar p/ enviar, o tempo de reposta da interface será o triplo mais rápido pois ela caiu na fila sem testar se a Amazon tava disposta a salvar naquele exato segundo em disco!
+3. Você pode usar sua AWS CLI `aws --endpoint-url=... s3 ls` pra atestar que em algum momento não listado no frontend o S3 foi atualizado!
