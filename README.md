@@ -6,37 +6,29 @@ Este projeto implementa um ecossistema **Serverless Enterprise-Ready**, focado e
 
 ---
 
-## 🔄 Fluxo de Observabilidade e Dados
+## 🔄 Arquitetura de Eventos & Monitoramento
 
-O sistema não apenas processa dados, mas fornece uma janela completa para a saúde da infraestrutura. O diagrama abaixo descreve a coreografia entre o processamento e a captura de logs/métricas.
+O ecossistema é dividido em dois processos paralelos: o **Processamento de Pedidos** (Assíncrono) e o **Monitoramento em Tempo Real** (Polling).
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant UI as Control Dashboard
-    participant API as API Gateway
-    participant Prod as Producer Lambda
-    participant SQS as SQS Queue
-    participant Cons as Consumer Lambda (Log Group)
-    participant S3 as S3 Data Lake
-    participant CW as CloudWatch Logs
-
-    Note over UI, S3: Ciclo de Vida do Pedido
-    UI->>API: POST /restapis/... (Simular Pedido)
-    Prod->>SQS: Dispatch Message
-    SQS->>Cons: Auto-Invoke (Trigger)
-    Cons->>S3: Archive Enriched JSON
-    Cons->>CW: Log Execution Details
-
-    Note over UI, CW: Monitoramento de Precisão (2s Polling)
-    loop Observabilidade Real-time
-        UI->>API: GET /restapis/... (Health Check)
-        API->>Prod: Fetch System Stats
-        Prod->>SQS: Get Depth (Visible/In-Flight)
-        Prod->>CW: Tail Latest Consumer Logs
-        Prod->>S3: List & Fetch Object Previews
-        Prod-->>UI: Unified Snapshot {sqs, s3, logs, orders}
+flowchart TD
+    subgraph EventFlow ["🚀 Fluxo de Eventos (Assíncrono)"]
+        A[Dashboard UI] -- simula --> B[Producer Lambda]
+        B -- envia --> C{SQS Queue}
+        C -- gatilho --> D[Consumer Lambda]
+        D -- persiste --> E[(S3 Data Lake)]
+        D -- gera --> F[[CloudWatch Logs]]
     end
+
+    subgraph MonitorFlow ["📊 Fluxo de Observabilidade"]
+        G[Dashboard UI] -- polling métricas/logs --> B
+        B -- profundidade --> C
+        B -- conteúdos --> E
+        B -- logs --> F
+    end
+
+    style EventFlow fill:#1e293b,stroke:#334155,color:#fff
+    style MonitorFlow fill:#0f172a,stroke:#334155,color:#fff
 ```
 
 ---
