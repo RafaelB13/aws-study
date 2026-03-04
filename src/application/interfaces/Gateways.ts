@@ -8,6 +8,7 @@ export interface IQueueGateway {
 export interface IStorageGateway {
   saveOrder(order: Order): Promise<void>;
   getStorageMetrics(): Promise<number>;
+  listOrders(): Promise<Order[]>;
 }
 
 export interface IMonitoringGateway {

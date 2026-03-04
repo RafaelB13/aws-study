@@ -1,31 +1,71 @@
-import { ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, PutObjectCommand, S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 import { IStorageGateway } from '@src/application/interfaces/Gateways';
 import { Order } from '@src/domain/entities';
 
 export class S3Gateway implements IStorageGateway {
   private readonly s3Client: S3Client;
-  private readonly bucketName = 'meu-bucket-arquivos';
+  private readonly bucketName = process.env.ORDER_BUCKET_NAME || 'meu-bucket-arquivos';
 
-  constructor(endpoint: string) {
-    this.s3Client = new S3Client({
+  constructor(endpoint?: string) {
+    // SMART SDK: Se estivermos no LocalStack, usamos o endpoint local e test credentials.
+    // Na AWS Real (sem endpoint passado), o SDK assume a autenticação via IAM Role da Lambda.
+    const isLocal = !!process.env.LOCALSTACK_HOSTNAME || (endpoint && endpoint.includes('localhost'));
+    
+    const config: S3ClientConfig = {
       region: 'us-east-1',
-      endpoint: endpoint,
-      forcePathStyle: true,
-      credentials: { accessKeyId: 'test', secretAccessKey: 'test' }
-    });
+    };
+
+    if (isLocal && endpoint) {
+      config.endpoint = endpoint;
+      config.forcePathStyle = true;
+      config.credentials = { accessKeyId: 'test', secretAccessKey: 'test' };
+    }
+
+    this.s3Client = new S3Client(config);
   }
 
   async saveOrder(order: Order): Promise<void> {
+    const enrichedOrder: Order = {
+      ...order,
+      status: 'PROCESSED',
+      processedAt: new Date().toISOString()
+    };
     await this.s3Client.send(new PutObjectCommand({
       Bucket: this.bucketName,
       Key: `${order.orderId}.json`,
-      Body: JSON.stringify(order, null, 2),
+      Body: JSON.stringify(enrichedOrder, null, 2),
       ContentType: 'application/json',
     }));
   }
 
   async getStorageMetrics(): Promise<number> {
-    const res = await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName }));
-    return res.KeyCount || 0;
+    try {
+      const res = await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName }));
+      return res.KeyCount || 0;
+    } catch (error) {
+      console.error('Error fetching S3 metrics:', error);
+      return 0;
+    }
+  }
+
+  async listOrders(): Promise<Order[]> {
+    try {
+      const listRes = await this.s3Client.send(new ListObjectsV2Command({ Bucket: this.bucketName }));
+      if (!listRes.Contents) return [];
+
+      const ordersPromises = listRes.Contents.map(async (obj) => {
+        return {
+          orderId: obj.Key?.replace('.json', '') || 'unknown',
+          product: 'Stored in S3',
+          orderDate: obj.LastModified?.toISOString() || '',
+          status: 'PROCESSED' as const
+        };
+      });
+
+      return Promise.all(ordersPromises);
+    } catch (error) {
+      console.error('Error listing orders from S3:', error);
+      return [];
+    }
   }
 }

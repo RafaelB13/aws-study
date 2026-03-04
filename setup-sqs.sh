@@ -25,16 +25,24 @@ echo "⏳ 2. Retrieving Queue ARN (Resource Name)..."
 QUEUE_ARN=$(aws sqs get-queue-attributes $REGION_FLAG --queue-url $QUEUE_URL --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
 echo "   ✅ Queue ARN: $QUEUE_ARN"
 
-echo "⏳ 3. Configuring Event Source Mapping (Lambda Trigger)..."
+# 3. Configuring Event Source Mapping (Lambda Trigger)...
 # We connect the SQS Queue directly to our Consumer Lambda so it wakes up 
 # automatically whenever new messages arrive.
 ACCOUNT_ID="000000000000"
 LAMBDA_ARN="arn:aws:lambda:$REGION:$ACCOUNT_ID:function:$CONSUMER_LAMBDA_NAME"
 
-aws lambda create-event-source-mapping $REGION_FLAG \
-    --function-name $LAMBDA_ARN \
-    --batch-size 10 \
-    --event-source-arn $QUEUE_ARN > /dev/null
+# CHECK IDEMPOTENCY: Se o trigger já existir, não tentamos criar de novo para evitar o erro ResourceConflictException
+MAPPING_EXISTS=$(aws lambda list-event-source-mappings $REGION_FLAG --function-name $LAMBDA_ARN --query "EventSourceMappings[?EventSourceArn=='$QUEUE_ARN']" --output text)
+
+if [ "$MAPPING_EXISTS" == "None" ] || [ -z "$MAPPING_EXISTS" ]; then
+    echo "   🔗 Creating new Event Source Mapping (SQS -> Lambda)..."
+    aws lambda create-event-source-mapping $REGION_FLAG \
+        --function-name $LAMBDA_ARN \
+        --batch-size 10 \
+        --event-source-arn $QUEUE_ARN > /dev/null
+else
+    echo "   📍 Event Source Mapping already exists. Skipping..."
+fi
 
 echo "✅ ALL CONNECTED! Queue '$QUEUE_NAME' is now triggering Lambda '$CONSUMER_LAMBDA_NAME'."
 echo "--------------------------------------------------------"

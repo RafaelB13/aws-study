@@ -32,9 +32,14 @@ npm run build:zip > /dev/null
 
 # Check if functions already exist to decide between Create or Update
 if aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda get-function --function-name my-producer-lambda > /dev/null 2>&1; then
-    echo "   📍 Lambdas already exist. Updating source code..."
+    echo "   📍 Lambdas already exist. Updating source code and configuration..."
+    # Update Code
     aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda update-function-code --function-name my-producer-lambda --zip-file fileb://function.zip > /dev/null
     aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda update-function-code --function-name my-consumer-lambda --zip-file fileb://function.zip > /dev/null
+    
+    # Update Configuration (important if the handler path changed)
+    aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda update-function-configuration --function-name my-producer-lambda --handler src/presentation/lambda/producer.handler > /dev/null
+    aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda update-function-configuration --function-name my-consumer-lambda --handler src/presentation/lambda/consumer.handler > /dev/null
 else
     echo "   📍 Creating new Lambdas..."
     aws --endpoint-url=http://localhost:4566 --region us-east-1 lambda create-function --function-name my-producer-lambda --runtime nodejs18.x --handler src/presentation/lambda/producer.handler --role arn:aws:iam::000000000000:role/irrelevant --zip-file fileb://function.zip > /dev/null
